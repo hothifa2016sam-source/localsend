@@ -751,6 +751,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
     final remoteSessionId = sessionState.remoteSessionId;
 
     _cancelRunningRequests(sessionState);
+    _recordSendHistory(sessionState);
 
     if (remoteSessionId == null) {
       closeSession(sessionId);
@@ -785,6 +786,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
     }
     TransferNotification.stop(sessionId);
     _cancelRunningRequests(sessionState);
+    _recordSendHistory(sessionState);
 
     state = state.updateSession(
       sessionId: sessionId,
