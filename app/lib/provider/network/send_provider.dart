@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:localsend_app/model/cross_file.dart';
 import 'package:localsend_app/model/send_mode.dart';
+import 'package:localsend_app/model/persistence/send_history_entry.dart';
 import 'package:localsend_app/model/state/send/send_session_state.dart';
 import 'package:localsend_app/model/state/send/sending_file.dart';
 import 'package:localsend_app/pages/home_page.dart';
@@ -13,6 +14,7 @@ import 'package:localsend_app/provider/device_info_provider.dart';
 import 'package:localsend_app/provider/file_transfer_provider.dart';
 import 'package:localsend_app/provider/http_provider.dart';
 import 'package:localsend_app/provider/selection/selected_sending_files_provider.dart';
+import 'package:localsend_app/provider/send_history_provider.dart';
 import 'package:localsend_app/provider/settings_provider.dart';
 import 'package:localsend_app/widget/dialogs/pin_dialog.dart';
 import 'package:localsend_isolates/isolate.dart';
@@ -502,6 +504,39 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
     _finish(sessionId: sessionId);
   }
 
+  void _recordSendHistory(SendSessionState sessionState) {
+    final transferNotifier = ref.read(fileTransferProvider);
+    final timestamp = DateTime.now().toUtc();
+    final entries = <SendHistoryEntry>[];
+
+    for (final sendingFile in sessionState.files.values) {
+      final status = transferNotifier.getStatus(
+        sessionId: sessionState.sessionId,
+        fileId: sendingFile.file.id,
+      );
+      if (status != FileStatus.finished && status != FileStatus.failed) {
+        continue;
+      }
+
+      entries.add(
+        SendHistoryEntry(
+          id: '${sessionState.sessionId}_${sendingFile.file.id}',
+          fileName: sendingFile.file.fileName,
+          fileSize: sendingFile.file.size,
+          receiverAlias: sessionState.target.alias,
+          timestamp: timestamp,
+          succeeded: status == FileStatus.finished,
+        ),
+      );
+    }
+
+    if (entries.isNotEmpty) {
+      unawaited(
+        ref.redux(sendHistoryProvider).dispatchAsync(AddSendHistoryEntriesAction(entries)),
+      );
+    }
+  }
+
   void _finish({required String sessionId}) {
     final sessionState = state[sessionId];
     if (sessionState == null) {
@@ -515,6 +550,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
       _logger.info('Transfer was canceled.');
     } else {
       final hasError = ref.read(fileTransferProvider).getStatuses(sessionId).any((status) => status == FileStatus.failed);
+      _recordSendHistory(sessionState);
       if (!hasError && sessionState.background == true) {
         // close session because everything is fine and it is in background
         closeSession(sessionId);
@@ -715,6 +751,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
     final remoteSessionId = sessionState.remoteSessionId;
 
     _cancelRunningRequests(sessionState);
+    _recordSendHistory(sessionState);
 
     if (remoteSessionId == null) {
       closeSession(sessionId);
@@ -749,6 +786,7 @@ class SendNotifier extends Notifier<Map<String, SendSessionState>> {
     }
     TransferNotification.stop(sessionId);
     _cancelRunningRequests(sessionState);
+    _recordSendHistory(sessionState);
 
     state = state.updateSession(
       sessionId: sessionId,

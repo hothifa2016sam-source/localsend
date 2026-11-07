@@ -2,6 +2,9 @@ name: Build windows exe (unsigned)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feature/send-history-30-days
 
 env:
   FLUTTER_VERSION: "3.41.9"
