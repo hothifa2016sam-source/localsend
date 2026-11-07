@@ -80,7 +80,6 @@ class _SendHistoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final timestamp = DateFormat.yMMMd().add_jm().format(entry.timestamp.toLocal());
     final statusText = entry.succeeded
         ? (isArabic ? 'تم الإرسال' : 'Sent')
         : (isArabic ? 'فشل الإرسال' : 'Failed');
