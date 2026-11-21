@@ -58,6 +58,7 @@ const _receiveHistory = 'ls_receive_history';
 
 // Sent file history
 const _sendHistory = 'ls_send_history';
+const _sendHistoryRetentionDays = 'ls_send_history_retention_days';
 
 // Favorites
 const _favorites = 'ls_favorites';
@@ -267,6 +268,13 @@ class PersistenceService {
   Future<void> setReceiveHistory(List<ReceiveHistoryEntry> entries) async {
     final historyRaw = entries.map((entry) => jsonEncode(entry.toJson())).toList();
     await _prefs.setStringList(_receiveHistory, historyRaw);
+  }
+
+  // Zero means keep sent-file records until they are manually removed.
+  int getSendHistoryRetentionDays() => _prefs.getInt(_sendHistoryRetentionDays) ?? 30;
+
+  Future<void> setSendHistoryRetentionDays(int days) async {
+    await _prefs.setInt(_sendHistoryRetentionDays, days);
   }
 
   List<SendHistoryEntry> getSendHistory() {
