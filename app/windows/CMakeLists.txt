@@ -76,10 +76,16 @@ install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
 
 install(FILES
   "${BINARY_NAME}.exe.manifest"
-  "localsend_msix_helper.msix"
-  "install_msix_helper.ps1"
   DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)
+
+# Optional MSIX helper files are not present in source checkouts used by CI.
+# Include them only when available; the normal Windows EXE does not require them.
+foreach(OPTIONAL_HELPER "localsend_msix_helper.msix" "install_msix_helper.ps1")
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${OPTIONAL_HELPER}")
+    install(FILES "${OPTIONAL_HELPER}" DESTINATION "${CMAKE_INSTALL_PREFIX}" COMPONENT Runtime)
+  endif()
+endforeach()
 
 install(FILES "${FLUTTER_ICU_DATA_FILE}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   COMPONENT Runtime)
