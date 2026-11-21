@@ -4,9 +4,7 @@ import 'package:localsend_app/model/persistence/send_history_entry.dart';
 import 'package:localsend_app/provider/persistence_provider.dart';
 import 'package:refena_flutter/refena_flutter.dart';
 
-const _historyRetention = Duration(days: 30);
-
-/// Stores outgoing transfer history locally for 30 days.
+/// Stores outgoing transfer history locally with configurable retention.
 final sendHistoryProvider = ReduxProvider<SendHistoryService, List<SendHistoryEntry>>((ref) {
   return SendHistoryService(ref.read(persistenceProvider));
 });
@@ -28,8 +26,9 @@ class SendHistoryService extends ReduxNotifier<List<SendHistoryEntry>> {
   }
 
   List<SendHistoryEntry> _removeExpired(Iterable<SendHistoryEntry> entries) {
-    final cutoff = DateTime.now().toUtc().subtract(_historyRetention);
-    final result = entries.where((entry) => !entry.timestamp.isBefore(cutoff)).toList()
+    final days = _persistence.getSendHistoryRetentionDays();
+    final cutoff = days == 0 ? null : DateTime.now().toUtc().subtract(Duration(days: days));
+    final result = entries.where((entry) => cutoff == null || !entry.timestamp.isBefore(cutoff)).toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return result;
   }
@@ -47,8 +46,9 @@ class AddSendHistoryEntriesAction extends AsyncReduxAction<SendHistoryService, L
       for (final entry in state) entry.id: entry,
       for (final entry in entries) entry.id: entry,
     };
-    final cutoff = DateTime.now().toUtc().subtract(_historyRetention);
-    final updated = byId.values.where((entry) => !entry.timestamp.isBefore(cutoff)).toList()
+    final days = notifier._persistence.getSendHistoryRetentionDays();
+    final cutoff = days == 0 ? null : DateTime.now().toUtc().subtract(Duration(days: days));
+    final updated = byId.values.where((entry) => cutoff == null || !entry.timestamp.isBefore(cutoff)).toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     await notifier._persistence.setSendHistory(updated);
     return updated;
@@ -73,5 +73,21 @@ class RemoveAllSendHistoryEntriesAction extends AsyncReduxAction<SendHistoryServ
   Future<List<SendHistoryEntry>> reduce() async {
     await notifier._persistence.setSendHistory([]);
     return [];
+  }
+}
+
+/// Updates retention and immediately removes records older than the new limit.
+class SetSendHistoryRetentionAction extends AsyncReduxAction<SendHistoryService, List<SendHistoryEntry>> {
+  final int days;
+
+  SetSendHistoryRetentionAction(this.days);
+
+  @override
+  Future<List<SendHistoryEntry>> reduce() async {
+    if (![0, 30, 90].contains(days)) return state;
+    await notifier._persistence.setSendHistoryRetentionDays(days);
+    final updated = notifier._removeExpired(state);
+    await notifier._persistence.setSendHistory(updated);
+    return updated;
   }
 }
