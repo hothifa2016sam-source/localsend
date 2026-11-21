@@ -1,0 +1,47 @@
+name: Build Windows history test
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/send-history-search-date-retention]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.9'
+          channel: stable
+      - name: Dependencies
+        working-directory: app
+        run: flutter pub get
+      - name: Build
+        working-directory: app
+        run: flutter build windows --release
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+      - name: Create installer
+        shell: pwsh
+        run: |
+          $source = (Resolve-Path 'app/build/windows/x64/runner/Release').Path
+          $lines = @(
+            '[Setup]',
+            'AppName=LocalSend History Test',
+            'AppVersion=1.0',
+            'DefaultDirName={localappdata}\\Programs\\LocalSend History Test',
+            'DefaultGroupName=LocalSend History Test',
+            'OutputDir=installer',
+            'OutputBaseFilename=LocalSend-History-Test-Windows11',
+            'PrivilegesRequired=lowest',
+            '[Files]',
+            ('Source: "' + $source + '\\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs'),
+            '[Icons]',
+            'Name: "{group}\\LocalSend History Test"; Filename: "{app}\\localsend_app.exe"'
+          )
+          $lines | Set-Content setup.iss
+          & "${env:ProgramFiles(x86)}\\Inno Setup 6\\ISCC.exe" setup.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LocalSend-History-Test-Windows11
+          path: installer/*.exe
+          if-no-files-found: error
