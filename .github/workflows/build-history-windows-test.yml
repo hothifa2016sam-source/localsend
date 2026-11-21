@@ -5,7 +5,7 @@ on:
     branches: [feature/send-history-search-date-retention]
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -17,7 +17,7 @@ jobs:
         run: flutter pub get
       - name: Build
         working-directory: app
-        run: flutter build windows --release
+        run: flutter build windows --release --verbose
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
       - name: Create installer
